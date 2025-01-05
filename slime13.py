@@ -198,4 +198,4 @@ def train_agent(epochs=50, max_steps=900, food_count=5):
     plt.show()
 
 # Run the training
-train_agent(epochs=100, max_steps=500, food_count=5)
+train_agent(epochs=500, max_steps=9000, food_count=9)

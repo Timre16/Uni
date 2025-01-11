@@ -1,0 +1,145 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from keras.models import Sequential
+from keras.layers import Dense
+import random
+
+# Parameters for the grid
+GRID_SIZE = 10  # Size of the box (GRID_SIZE x GRID_SIZE)
+FOOD_COUNT = 5  # Number of food items
+
+# Generate random food positions
+def generate_food(grid_size, food_count):
+    food_positions = set()
+    while len(food_positions) < food_count:
+        food_positions.add((random.randint(0, grid_size - 1), random.randint(0, grid_size - 1)))
+    return list(food_positions)
+
+# Helper function to calculate the move direction
+def get_direction(start, end):
+    """Returns the direction to move from start to end as one-hot encoding: [up, down, left, right]."""
+    x1, y1 = start
+    x2, y2 = end
+    if x1 > x2:
+        return [1, 0, 0, 0]  # Up
+    elif x1 < x2:
+        return [0, 1, 0, 0]  # Down
+    elif y1 > y2:
+        return [0, 0, 1, 0]  # Left
+    elif y1 < y2:
+        return [0, 0, 0, 1]  # Right
+    return [0, 0, 0, 0]  # Stay in case of equal positions
+
+# Generate synthetic training data
+def generate_training_data(grid_size, samples=1000):
+    X = []
+    y = []
+    for _ in range(samples):
+        slime_position = (random.randint(0, grid_size - 1), random.randint(0, grid_size - 1))
+        food_position = (random.randint(0, grid_size - 1), random.randint(0, grid_size - 1))
+        input_data = [slime_position[0], slime_position[1], food_position[0], food_position[1]]
+        direction = get_direction(slime_position, food_position)
+        X.append(input_data)
+        y.append(direction)
+
+    # Convert X and y to NumPy arrays with the correct shape
+    X = np.array(X, dtype=np.float32)
+    y = np.array(y, dtype=np.float32)
+
+    return X, y
+
+# Create the neural network
+def create_model():
+    model = Sequential([
+        Dense(16, activation='relu', input_dim=4),
+        Dense(16, activation='relu'),
+        Dense(4, activation='softmax')  # Four possible directions
+    ])
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+# Train the model
+X_train, y_train = generate_training_data(GRID_SIZE, samples=5000)
+model = create_model()
+model.fit(X_train, y_train, epochs=10, batch_size=32, verbose=1)
+
+# Predict the next move
+def predict_move(model, slime_position, food_position):
+    input_data = np.array([slime_position[0], slime_position[1], food_position[0], food_position[1]]).reshape(1, -1)
+    move = np.argmax(model.predict(input_data))
+    return move
+
+# Map move index to direction
+def apply_move(position, move):
+    x, y = position
+    if move == 0:  # Up
+        return max(0, x - 1), y
+    elif move == 1:  # Down
+        return min(GRID_SIZE - 1, x + 1), y
+    elif move == 2:  # Left
+        return x, max(0, y - 1)
+    elif move == 3:  # Right
+        return x, min(GRID_SIZE - 1, y + 1)
+
+# Initialize the grid and the food positions
+food_positions = generate_food(GRID_SIZE, FOOD_COUNT)
+slime_position = (0, 0)  # Starting position of the slime
+path_taken = []
+
+# Prepare the frames for the animation
+frames = []
+
+# Main loop to capture all food
+while food_positions:
+    # Find the nearest food
+    nearest_food = min(food_positions, key=lambda food: abs(food[0] - slime_position[0]) + abs(food[1] - slime_position[1]))
+
+    # Predict the next move using the NN
+    move = predict_move(model, slime_position, nearest_food)
+
+    # Apply the move
+    slime_position = apply_move(slime_position, move)
+    path_taken.append(slime_position)
+
+    # Check if food is captured
+    if slime_position in food_positions:
+        food_positions.remove(slime_position)
+
+    # Prepare the frame for the animation
+    frame = {
+        "slime": slime_position,
+        "food": food_positions.copy()
+    }
+    frames.append(frame)
+
+# Plot the animation
+def update(frame):
+    slime_position = frame["slime"]
+    food_positions = frame["food"]
+
+    grid = np.zeros((GRID_SIZE, GRID_SIZE))
+
+    # Mark slime's position
+    grid[slime_position] = 1
+
+    # Mark food positions
+    for fx, fy in food_positions:
+        grid[fx, fy] = 2
+
+    # Clear the plot and draw the updated grid
+    plt.cla()
+    plt.imshow(grid, cmap="viridis", origin="upper")
+    plt.title("Slime Capturing Food")
+    plt.axis("off")
+
+# Create and run the animation
+fig = plt.figure(figsize=(5, 5))
+ani = FuncAnimation(fig, update, frames=frames, interval=500)
+
+# Save animation to an MP4 file
+ani.save("slime_simulation.mp4", writer="ffmpeg")
+
+# Display animation in the notebook
+from IPython.display import HTML
+HTML(ani.to_jshtml())

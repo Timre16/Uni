@@ -22,7 +22,7 @@ REFERENCE_FOOD_COUNT = 9
 # ---------------------------
 # LABYRINTH SIZE
 # ---------------------------
-LABYRINTH_SIZE = (20, 20)  # Change here for bigger or smaller mazes
+LABYRINTH_SIZE = (50, 50)  # Change here for bigger or smaller mazes
 
 # ---------------------------
 # SCALING FACTOR
